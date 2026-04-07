@@ -47,6 +47,9 @@ vectorstores
 workflow
 workflows
 
+# People
+Acatl
+
 # Models and Products
 Anthropic
 ChatGPT

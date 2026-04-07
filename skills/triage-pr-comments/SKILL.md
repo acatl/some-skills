@@ -10,8 +10,12 @@ description: >
   Not for: draft PRs with no comments, self-review of your own code,
   or PRs where all comments are already resolved. Not a code review tool —
   use review-local or start-pr-cycle for that.
+license: MIT
+compatibility: Requires git, gh (GitHub CLI), and jq.
 argument-hint: "#<pr-number>"
 disable-model-invocation: true
+metadata:
+  author: Acatl
 ---
 
 # PR Comment Triage

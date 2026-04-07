@@ -8,6 +8,10 @@ description: >
   for partial actions like "commit this", "push my branch", "review my
   code", or "create a PR" — those are individual operations, not the full
   cycle. Only activate when the user wants the entire end-to-end workflow.
+license: MIT
+compatibility: Requires git and gh (GitHub CLI). Requires review-local and triage-pr-comments skills.
+metadata:
+  author: Acatl
 ---
 
 # PR Cycle

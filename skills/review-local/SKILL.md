@@ -9,6 +9,10 @@ description: >
   Not for: reviewing someone else's PR (use triage-pr-comments for that),
   running the full PR submission workflow (use start-pr-cycle), or
   reviewing a single file in isolation.
+license: MIT
+compatibility: Requires git.
+metadata:
+  author: Acatl
 ---
 
 # Pre-PR Local Review

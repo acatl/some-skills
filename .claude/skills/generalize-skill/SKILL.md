@@ -7,7 +7,10 @@ description: >
   activate for general code review, markdown linting, or skill authoring
   from scratch — this skill is specifically for auditing and improving
   existing skills.
+license: MIT
 argument-hint: "skills/<skill-name>"
+metadata:
+  author: Acatl
 disable-model-invocation: true
 ---
 
