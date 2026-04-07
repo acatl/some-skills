@@ -431,61 +431,45 @@ Omit rows with zero count.
 
 ---
 
-### 🔴 Blockers
+### Findings
 
-_(Omit this entire section if there are no blockers.)_
+A single combined table listing every finding, ordered by severity (Blockers → Warnings → Style), then by `#`. Use sequential `#N` indexing across all severities so the user can reference any finding by number without collision.
 
-Summary table first, then expanded details for each finding:
+_(Omit this section entirely if there are no findings.)_
 
-| #   | Lens          | File            | Summary              |
-| --- | ------------- | --------------- | -------------------- |
-| N   | \<lens name\> | `\<file path\>` | \<one-line summary\> |
+| #   | Severity      | Lens          | File            | Summary              |
+| --- | ------------- | ------------- | --------------- | -------------------- |
+| N   | 🔴 Blocker / 🟠 Warning / 🟡 Style | \<lens name\> | `\<file path\>` | \<one-line summary\> |
 
-Then for each finding:
+---
 
-#### #N `<file path>` — \<short summary\>
+### Finding Details
+
+Expanded details for every finding, grouped by severity in the same order as the table above (Blockers first, then Warnings, then Style). Within each severity, list in `#` order.
+
+Omit a severity sub-section if it has no findings.
+
+#### 🔴 Blockers
+
+##### #N `<file path>` — \<short summary\>
 
 - **Lens**: \<which review lens identified this\>
 - **Issue**: \<what is wrong\>
 - **Why it matters**: \<impact — security, data loss, correctness, etc.\>
 - **Suggested fix**: \<concrete action to resolve\>
 
----
+#### 🟠 Warnings
 
-### 🟠 Warnings
-
-_(Omit this entire section if there are no warnings.)_
-
-Same format as Blockers — summary table, then expanded details:
-
-| #   | Lens          | File            | Summary              |
-| --- | ------------- | --------------- | -------------------- |
-| N   | \<lens name\> | `\<file path\>` | \<one-line summary\> |
-
-Then for each finding:
-
-#### #N `<file path>` — \<short summary\>
+##### #N `<file path>` — \<short summary\>
 
 - **Lens**: \<which review lens identified this\>
 - **Issue**: \<what is wrong\>
 - **Why it matters**: \<impact\>
 - **Suggested fix**: \<concrete action to resolve\>
 
----
+#### 🟡 Style
 
-### 🟡 Style
-
-_(Omit this entire section if there are no style findings.)_
-
-Same format as Blockers — summary table, then expanded details:
-
-| #   | Lens          | File            | Summary              |
-| --- | ------------- | --------------- | -------------------- |
-| N   | \<lens name\> | `\<file path\>` | \<one-line summary\> |
-
-Then for each finding:
-
-#### #N `<file path>` — \<short summary\>
+##### #N `<file path>` — \<short summary\>
 
 - **Lens**: \<which review lens identified this\>
 - **Issue**: \<what is wrong\>
