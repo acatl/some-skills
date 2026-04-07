@@ -1,0 +1,17 @@
+{
+  "name": "some-skills",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "markdownlint-cli2 '**/*.md'",
+    "lint:fix": "markdownlint-cli2 --fix '**/*.md'",
+    "spellcheck": "cspell '**/*.md'",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "cspell": "^8.17.0",
+    "husky": "^9.1.0",
+    "lint-staged": "^15.4.0",
+    "markdownlint-cli2": "^0.17.0"
+  }
+}

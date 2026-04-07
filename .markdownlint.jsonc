@@ -1,0 +1,10 @@
+{
+  // Obsidian-friendly markdownlint config
+  "MD013": false, // Line length — Obsidian wraps visually
+  "MD024": false, // Duplicate headings — skills use repeated output template headings
+  "MD033": false, // Inline HTML — Obsidian uses HTML for callouts/embeds
+  "MD034": false, // Bare URLs — Obsidian auto-links them
+  "MD036": false, // Emphasis as heading — skills use italic notes for conditional sections
+  "MD040": false, // Fenced code language — skills use unlabeled blocks for format templates
+  "MD047": false  // File ending newline — Obsidian doesn't always add one
+}
