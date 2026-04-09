@@ -45,6 +45,12 @@ Never auto-advances past a gate. User must confirm each stage explicitly.
 
 `/triage-pr-comments` owns triage → fix → commit. `start-pr-cycle` resumes at Stage 4.
 
+When resuming here from `/triage-pr-comments`, open with:
+
+> **Triage implementation committed. Resuming PR cycle at Stage 4: Sync with origin/main.**
+
+Then proceed with the Stage 4 steps.
+
 | From                                    | To            | Condition                                    |
 | --------------------------------------- | ------------- | -------------------------------------------- |
 | /triage-pr-comments (triage + fix + commit) | [4] Update    | User confirms commit in triage skill         |
@@ -65,7 +71,7 @@ git status
 git log origin/main..HEAD --oneline
 ```
 
-**Gate:** Show branch name and ask: "Is this the right branch? Should I proceed?"
+**Gate:** Show branch name and ask: "Is this the right branch? If yes, I'll run `/review-local` to review your changes."
 
 Stop if the user says no. Never assume the stated branch matches the current branch.
 
@@ -99,6 +105,11 @@ Fix only what the user approved in Stage 1 gate.
 
 **Do not advance to Stage 3 if any blocker remains unresolved.**
 
+When all approved fixes are done and checks pass, output:
+
+> **Stage 2 complete.** All approved fixes done and checks pass.
+> Ready to move to **Stage 3: Commit**? I'll show you the files to stage and a proposed commit message.
+
 ---
 
 ## Stage 3 — Commit
@@ -125,6 +136,11 @@ Commit format:
 <type>(<scope>): <description>
 ```
 
+After the commit runs, output:
+
+> **Committed** `<hash>` — `<message>`.
+> Ready to move to **Stage 4: Sync with origin/main**? I'll fetch and merge, then re-run checks.
+
 ---
 
 ## Stage 4 — Update with origin/main
@@ -138,8 +154,11 @@ If conflicts arise, present them to the user and resolve before continuing.
 
 After merge, re-run the project's typecheck, lint, and test commands on affected files.
 
-- If checks pass (or the merge was a no-op) → proceed to Stage 5.
+- If checks pass (or the merge was a no-op) → output the handoff below, then proceed to Stage 5.
 - If checks fail → loop back to Stage 2 (Fix) with the specific errors.
+
+> **Stage 4 complete.** Merge clean, checks pass.
+> Ready to move to **Stage 5: Push**? I'll confirm the target branch before pushing.
 
 ---
 
@@ -203,13 +222,19 @@ EOF
 )"
 ```
 
-Return the PR URL.
+Output the PR URL as a clickable markdown link — format: `[pr-title](pr-url)`
+
+Example: `[feat(auth): add OAuth login](https://github.com/org/repo/pull/42)`
 
 ---
 
 ## Stage 6a — CI Watch (optional)
 
-After push, offer: **"Want me to watch CI and triage any failures?"**
+After PR creation, output two messages:
+
+1. **CI watch offer:** "Want me to watch CI and triage any failures?"
+2. **Review nudge** (informational — no confirmation needed):
+   > Once reviewers comment on your PR, run `/triage-pr-comments` to go through the feedback whenever you're ready. (If you have automated reviewers such as Copilot, they'll run shortly after the push.)
 
 If the user declines, no further action needed. If they accept:
 
@@ -233,7 +258,13 @@ Run this using the Bash tool's `run_in_background` parameter (not shell `&`). Cl
 
 You will be notified when the background command finishes via Claude Code's background task notification.
 
-**If CI passed:** Report "CI passed" — no action needed.
+**If CI passed:** Output:
+
+> **CI passed.** Your PR is open and green.
+>
+> Reviews may come in at any time — teammates may comment, and if you have automated reviewers
+> such as Copilot, they'll run after each push. When reviews arrive, run `/triage-pr-comments`
+> to go through the feedback whenever you're ready.
 
 **If CI failed:** Triage the failure:
 

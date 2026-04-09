@@ -651,6 +651,16 @@ If the PR had a `CHANGES_REQUESTED` review decision, suggest re-requesting revie
 
 **Important**: Do NOT re-request review automatically. Present the suggestion and wait for the user to confirm.
 
+After the user responds (confirm or decline), output:
+
+> **This review round is complete.**
+>
+> Expect more feedback — human reviewers may respond to your replies, and if you have automated
+> reviewers such as Copilot, they'll run after each push. When new comments arrive, run
+> `/triage-pr-comments` again to start the next round.
+>
+> Repeat until the PR is approved and merged.
+
 ---
 
 ## Principles
