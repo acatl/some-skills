@@ -361,7 +361,10 @@ After the overview table, say:
 
 > "Here's the full picture. I'll walk you through each comment one at a time — even the straightforward ones. For each one you can confirm my read, choose a different approach, or flag it for deeper discussion. Ready? Starting with #1."
 
-Then **for each comment in order**, call `AskUserQuestion` with the following card as the question content. The selectable options at the bottom are the actual `AskUserQuestion` choices.
+Then **for each comment in order**:
+
+1. **Output the card below as a regular markdown message.** Do not put it inside `AskUserQuestion` — markdown does not render there.
+2. **Immediately follow** with a `AskUserQuestion` call using only: question = `"What's your call on #<N>?"`, header = `"#<N> of <total>"`, and the options listed after the card template.
 
 ---
 
@@ -378,41 +381,39 @@ Then **for each comment in order**, call `AskUserQuestion` with the following ca
 <relevant lines — at least 5 before and after the flagged line>
 ```
 
-**Scoring:**
+**Complexity:**
+\<Mechanical / Targeted / Involved / Structural\> — \<one sentence: why this level, what makes it more or less than adjacent levels\>
 
-| Dimension              | Score   | Reasoning                                                        |
-| ---------------------- | ------- | ---------------------------------------------------------------- |
-| Technical Validity     | Y/P/N   | \<what you verified — is there a real issue?\>                   |
-| Architecture Alignment | Y/P/N   | \<which standard applies, or "not covered — neutral"\>           |
-| Convention Compliance  | Y/P/N   | \<which convention applies, or "not covered — neutral"\>         |
-| Practical Impact       | Y/P/N   | \<concrete effect on correctness, safety, or maintainability\>   |
-| YAGNI                  | Y/P/N/— | \<usage found / speculative / "not applicable — this is a fix"\> |
+&nbsp;
 
-**Complexity:** \<Mechanical / Targeted / Involved / Structural\> — \<one sentence: why this level, what makes it more or less than adjacent levels\>
-**Dependencies:** \<"Independent" or list related items by # and file + line\>
+**Dependencies:**
+\<"Independent" or list related items by # and file + line\>
 
-**My reasoning:** \<2–3 sentences: what you read and verified, why the scores landed where they did, what reviewer authority factor applied if any, and what new information would change this read\>
+&nbsp;
+
+**My reasoning:**
+\<2–3 sentences: what you read and verified, why this initial read, what reviewer authority factor applied if any, and what new information would change it\>
 
 **Initial Read: \<VERDICT\>**
 
-Format the `AskUserQuestion` selectable options so all detail is inline — the user should never need to scroll up to read the card while choosing. Always put the recommended option first. Each option follows this format:
+---
 
-```
-<Letter> — <name> · Recommended       ← only on the top option
-<one-sentence description of what this does>
-Pro: <concrete benefit>
-Con: <concrete cost or risk>
-```
+_(End of markdown card message. Now immediately call `AskUserQuestion`.)_
 
-**Required options (always present, always in this order):**
+**`AskUserQuestion` call — options only, no card content repeated:**
 
-1. **Recommended option first** (A) — the specific approach you would take; include the exact change
-2. **Meaningful alternative** (B) — a genuinely different approach, not a minor variation
-3. **Do nothing / defer** (always last before meta-options) — when this is the right call; what the user is accepting by choosing it
-4. **Discuss later** — Flag for discussion after the wizard
-5. **Custom** — Type your own decision
+- **question**: `"What's your call on #<N>?"`
+- **header**: `"#<N> of <total>"`
+- **options** (always in this order, max 4):
 
-Always include "Do nothing" — it is a legitimate choice the user should make consciously, not by omission. Always include the recommended option even for Decline verdicts (show what acting on it would mean, so the user can override if they disagree with the decline).
+  1. **Recommended option** — label: `"A — <name> (Recommended)"` · description: one sentence of what it does, then `Pro: ...` then `Con: ...`
+  2. **Meaningful alternative** — label: `"B — <name>"` · description: same format
+  3. **Do nothing / defer** — label: `"C — Do nothing"` · description: when this is the right call; what the user is accepting
+  4. **Discuss later** — label: `"D — Discuss later"` · description: `"Flag for discussion after the wizard."`
+
+The automatic **Other** option serves as Custom input — do not add a fifth option.
+
+Always include "Do nothing" — it is a legitimate choice the user should make consciously, not by omission. Always include the recommended option even for Decline verdicts (show what acting on it would mean, so the user can override).
 
 ---
 
