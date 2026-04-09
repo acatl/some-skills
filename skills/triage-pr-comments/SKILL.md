@@ -69,38 +69,59 @@ You are a Principal Engineer triaging PR review comments. Determine scope → ev
 
 ---
 
-## Execution Strategy — Parallel Opportunities
+## Execution Strategy
 
-Phases have dependencies, but many steps within and across phases are independent. Use parallel tool calls (multiple Bash calls in one response) or the Agent tool with sub-agents where noted.
+Phases 1–4 (all data fetching and analysis) run inside a **sub-agent**. Phase 5 (the interactive wizard) runs in the **main conversation** — `AskUserQuestion` requires it.
 
 ```
-Phase 1: Resolve PR number (sequential — must complete first)
-    ↓
-    ├── Step 1.2: Fetch metadata ─┐
-    ├── 1a: Fetch linked issues  ├── all parallel (only need PR number)
-    └── 1b: Fetch diff          ─┘
-    ↓
-    1c: Define scope (needs results from above)
-    ↓
-    ┌──────────────────────────────┐
-    │  Phase 2: Fetch comments     │  ← run in parallel
-    │  ├── 2a: Inline comments  ─┐ │
-    │  ├── 2b: Review bodies    ─┤ │  (2a/2b/2c are independent)
-    │  └── 2c: Issue comments   ─┘ │
-    ├──────────────────────────────┤
-    │  Phase 3: Read standards     │  ← run in parallel with Phase 2
-    └──────────────────────────────┘
-    ↓
-    Phase 4: Analyze comments (each thread is independent — parallelize via sub-agents for large PRs)
-    ↓
-    Phase 5: Present triage (sequential — needs all Phase 4 results)
+Main agent
+    │
+    ├── Announce: "Starting triage for PR #N — gathering data and analyzing comments."
+    │
+    └── Dispatch sub-agent → Phases 1–4
+            │
+            │   Phase 1: Resolve PR number (sequential)
+            │       ↓
+            │       ├── 1.2: Fetch metadata ─┐
+            │       ├── 1a: Fetch issues     ├── parallel (need PR number only)
+            │       └── 1b: Fetch diff      ─┘
+            │       ↓
+            │       1c: Define scope
+            │       ↓
+            │       ┌──────────────────────────────┐
+            │       │  Phase 2: Fetch comments      │  ← parallel
+            │       │  ├── 2a: Inline comments   ─┐ │
+            │       │  ├── 2b: Review bodies     ─┤ │
+            │       │  └── 2c: Issue comments    ─┘ │
+            │       ├──────────────────────────────┤
+            │       │  Phase 3: Read standards      │  ← parallel with Phase 2
+            │       └──────────────────────────────┘
+            │       ↓
+            │       Phase 4: Analyze comments
+            │       (threads independent — parallelize via nested sub-agents for >5 threads)
+            │       ↓
+            │       Return structured analysis to main agent
+            │
+    ├── Receive sub-agent results
+    │
+    └── Phase 5: Present triage + run interactive wizard (main conversation)
 ```
 
-**When to use sub-agents**: If Phase 2 yields more than ~5 comment threads, consider dispatching Phase 4 analysis across sub-agents (one per thread or batch of threads). Each sub-agent receives the scope statement, project standards, and its assigned comment threads, then returns verdicts. The main agent assembles the final triage.
+**Sub-agent return format**: The sub-agent must return all analysis as structured text so the main agent can render cards without re-fetching anything. See Phase 4 for the required per-comment return format.
+
+**Transparency messages**: Before each major operation, output a one-line status so the user knows what is happening. Required messages are specified at each phase below.
+
+---
+
+## Sub-Agent: Phases 1–4
+
+The main agent dispatches a single sub-agent to run Phases 1–4. Everything below up to Phase 5 executes inside that sub-agent.
 
 ---
 
 ## Phase 1: Resolve PR and Determine Scope
+
+> **Transparency message:** _"Resolving PR and fetching metadata, linked issues, and diff…"_
 
 1. **Resolve the PR number** using the first method that succeeds:
    1. **Explicit argument**: If the user provided `#<number>`, use that.
@@ -155,6 +176,8 @@ Derive from (priority order): linked issue(s) → PR title/description → actua
 
 ## Phase 2: Fetch Comments
 
+> **Transparency message:** _"Fetching all comment threads (inline, review bodies, discussion)…"_
+
 **Assumption**: The user is already on the PR's branch (or in a worktree of it). All file reads use the current working directory.
 
 **Shell/jq safety**: Use `select(.body | length > 0)` to filter empty bodies — never `select(.body != "")`. The `length > 0` form avoids the `!=` operator entirely, which the model sometimes corrupts to the Unicode not-equal character, causing a jq parse error.
@@ -202,6 +225,8 @@ These are general discussion comments on the PR.
 
 ## Phase 3: Read Project Standards
 
+> **Transparency message:** _"Reading project standards and conventions…"_
+
 Read the project's authoritative standards:
 
 1. `CLAUDE.md` (project instructions and conventions)
@@ -214,23 +239,42 @@ These documents are the authority for evaluating comments. When a review comment
 
 ## Phase 4: Analyze Each Comment
 
+> **Transparency message:** _"Analyzing N comment threads against project standards and PR scope…"_ (use actual count once known)
+
 For each comment thread (not individual replies — analyze the thread as a unit).
 
-**Sub-agent return format**: When dispatching to sub-agents (see Execution Strategy), each sub-agent must return results in this exact structure per thread:
+**Sub-agent return format**: At the end of Phase 4, the sub-agent must return all results as structured text. The main agent uses this to render cards in Phase 5 without re-fetching anything. Return one block per comment thread:
 
 ```
+---
+#: <N>
 File: <path> L<line>
 Reviewer: <username>
-Verdict: <verdict>
-Scores: TV:<Y/P/N> AA:<Y/P/N> CC:<Y/P/N> PI:<Y/P/N> YAGNI:<Y/P/N/—>
-Rule: <which decision rule matched>
+Summary: <one-line description of the comment>
+Initial Read: <verdict>
 Complexity: <Mechanical/Targeted/Involved/Structural> (AGREE/AGREE WITH MODIFICATION only)
 Dependencies: <Independent or list>
-Analysis: <reasoning>
-Suggested approach: <if applicable>
+Reasoning: <2-3 sentences>
+Option A (recommended): <specific action> | Pro: <benefit> | Con: <cost>
+Option B: <alternative> | Pro: <benefit> | Con: <cost>
+Option C - Do nothing: <when this is right> | Con: <what user accepts>
+Code context: <file path>, L<start>-L<end>
+---
 ```
 
-The main agent uses these to assemble the full triage output.
+Also return a preamble block before the per-thread results:
+
+```
+PR: #<number> — <title>
+Branch: <branch>
+Author: <author>
+URL: <url>
+Review Status: <reviewDecision>
+Linked Issues: <list or "None">
+Scope: <scope statement from Phase 1c>
+Files changed: <list>
+Total comments: <N>
+```
 
 ### 4a. Gather Context
 
@@ -310,6 +354,8 @@ For AGREE and AGREE WITH MODIFICATION verdicts, assign a **Complexity** level (M
 ---
 
 ## Phase 5: Present Triage
+
+> **Main agent resumes here.** The sub-agent has returned all PR metadata, scope, and per-comment analysis. Do not re-fetch anything — render directly from the returned data.
 
 Structure your output exactly as follows:
 
