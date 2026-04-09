@@ -395,23 +395,30 @@ Then **for each comment in order**, call `AskUserQuestion` with the following ca
 
 **Initial Read: \<VERDICT\>**
 
-**Options:**
+Format the `AskUserQuestion` selectable options so all detail is inline — the user should never need to scroll up to read the card while choosing. Always put the recommended option first. Each option follows this format:
 
-| | Option | Pros | Cons |
-| - | ------ | ---- | ---- |
-| A | \<recommended approach — specific and actionable\> | \<concrete benefit\> | \<concrete cost or risk\> |
-| B | \<meaningful alternative\> | \<concrete benefit\> | \<concrete cost or risk\> |
-| C | Do nothing / defer | \<when this is the right call\> | \<what you'd be accepting\> |
+```
+<Letter> — <name> · Recommended       ← only on the top option
+<one-sentence description of what this does>
+Pro: <concrete benefit>
+Con: <concrete cost or risk>
+```
 
-Always include option A (even for Decline — show what acting on it would mean). Always include option C — "do nothing" is a legitimate choice the user should make consciously, not by default.
+**Required options (always present, always in this order):**
 
-**`AskUserQuestion` selectable options:** A · B · C · Custom · Discuss later
+1. **Recommended option first** (A) — the specific approach you would take; include the exact change
+2. **Meaningful alternative** (B) — a genuinely different approach, not a minor variation
+3. **Do nothing / defer** (always last before meta-options) — when this is the right call; what the user is accepting by choosing it
+4. **Discuss later** — Flag for discussion after the wizard
+5. **Custom** — Type your own decision
+
+Always include "Do nothing" — it is a legitimate choice the user should make consciously, not by omission. Always include the recommended option even for Decline verdicts (show what acting on it would mean, so the user can override if they disagree with the decline).
 
 ---
 
 **After the user responds to each card:**
 
-- **A / B / C**: Record the decision. Confirm in one line: _"Got it — #\<N\> → Option \<X\>."_ Immediately move to the next card.
+- **Any option A/B/C/Do nothing**: Record the decision. Confirm in one line: _"Got it — #\<N\> → \<option name\>."_ Immediately move to the next card.
 - **Custom**: Ask them to type their decision. Record it. Confirm in one line and move on.
 - **Discuss later**: Add to the flagged list. Confirm in one line: _"Flagged #\<N\> for discussion after the wizard."_ Move to the next card immediately.
 
