@@ -11,51 +11,56 @@ description: >
   reviewing a single file in isolation.
 license: MIT
 compatibility: Requires git.
+disable-model-invocation: true
 metadata:
   author: Acatl
 ---
 
 # Pre-PR Local Review
 
-**Execution rule:** Perform this review directly in the main conversation. Do NOT delegate to a subagent. This skill's review framework IS the review. Execute it yourself, step by step, and produce the output format defined below.
-
 Review all local committed changes against the remote main branch. This is a pre-flight self-review before creating a PR.
 
-## Execution Strategy — Parallel Opportunities
+## Execution Strategy
 
-Phases have dependencies, but many steps within and across phases are independent. Use parallel tool calls (multiple Bash/Read calls in one response) wherever noted. Maximizing parallelism significantly reduces review time.
+Data gathering and analysis run inside a **sub-agent** (keeps tool call noise out of the main conversation). The interactive presentation runs in the **main conversation** — `AskUserQuestion` requires it.
 
 ```
-Batch 1 (all parallel — no dependencies):
-  ├── git fetch origin main && git log --oneline origin/main..HEAD
-  ├── git diff --name-only origin/main...HEAD
-  ├── openspec list --json
-  └── Read CLAUDE.md, package.json, README.md (and other required root docs) (Phase 0 orientation)
-  ↓
-Gate: If no commits diverge from main, stop.
-  ↓
-Batch 2 (all parallel — only need file list + openspec result):
-  ├── git diff origin/main...HEAD (split by top-level directory into parallel chunks)
-  │   └── (group small areas together, split large areas)
-  └── Phase 1 artifacts (if OpenSpec changes detected):
-      ├── openspec show <name> --json
-      ├── Read proposal.md, design.md, tasks.md (all parallel)
-      └── Read delta spec files (all parallel)
-  ↓
-Batch 3 (parallel — only need diffs):
-  └── Read full source files for context (batch by area):
-      └── (Read files that are close together in parallel batches)
-  ↓
-Batch 4 (parallel — targeted verification):
-  └── Spot-check grep/read for specific concerns found during diff review:
-      ├── e.g., check linter config for boundary constraints
-      ├── e.g., grep for usage of a moved export
-      └── (each check is independent — run all in parallel)
-  ↓
-Produce review output (sequential — needs all results)
+Main agent
+    │
+    ├── Announce: "Starting local review — gathering data and analyzing changes."
+    │
+    └── Dispatch sub-agent → Phases 0–1 + Batches 1–4
+            │
+            │   Batch 1 (parallel — no dependencies):
+            │     ├── git fetch origin main && git log --oneline origin/main..HEAD
+            │     ├── git diff --name-only origin/main...HEAD
+            │     ├── openspec list --json
+            │     └── Read CLAUDE.md, package.json, README.md (Phase 0 orientation)
+            │   ↓
+            │   Gate: no commits diverge from main → return "no-commits" signal, stop.
+            │   ↓
+            │   Batch 2 (parallel — needs file list + openspec result):
+            │     ├── git diff origin/main...HEAD (split by top-level directory)
+            │     └── Phase 1 artifacts if OpenSpec changes detected:
+            │           ├── openspec show <name> --json
+            │           ├── Read proposal.md, design.md, tasks.md (parallel)
+            │           └── Read delta spec files (parallel)
+            │   ↓
+
+            │   Batch 3 (parallel — needs diffs):
+            │     └── Read full source files for context (batch by area)
+            │   ↓
+            │   Batch 4 (parallel — targeted verification):
+            │     └── Spot-check grep/read for specific concerns found in diffs
+            │   ↓
+            │   Apply review lenses → classify findings → return structured analysis
+            │
+    ├── Receive sub-agent results
+    │
+    └── Stage 1 + Stage 2: Present summary + run interactive wizard (main conversation)
 ```
 
-**Rules:**
+**Sub-agent parallelism rules:**
 
 - Always batch independent tool calls into a single response
 - Split large diffs by top-level directory into parallel Bash calls
@@ -63,11 +68,52 @@ Produce review output (sequential — needs all results)
 - Verification checks (grep for unused exports, check config files) are independent — parallelize them
 - Never wait for one read to finish before starting an unrelated read
 
+### Sub-Agent Return Format
+
+The sub-agent must return all analysis as structured text so the main agent can render Stage 1 and Stage 2 without re-fetching anything.
+
+**If no commits diverge from main**, return only:
+
+```
+STATUS: no-commits
+```
+
+**Otherwise**, return a preamble block followed by one block per finding:
+
+```
+PREAMBLE
+Commits: <list of commits, one per line>
+Files changed: <list>
+OpenSpec changes: <list or "None">
+Change summary:
+- <bullet 1>
+- <bullet 2>
+OpenSpec alignment: <"Fully aligned." or per-change findings>
+TL;DR: <2–4 sentence paragraph>
+Risk level: <High / Medium / Low>
+Merge recommendation: <Approve / Needs Revision / Block>
+Total findings: <N> 🔴 <N> 🟠 <N> 🟡 <N>
+END_PREAMBLE
+
+---
+#: <N>
+Severity: <🔴 Blocker / 🟠 Warning / 🟡 Style>
+Lens: <lens name>
+File: <file path> L<line>
+Summary: <one-line summary>
+Issue: <what is wrong>
+Why it matters: <impact>
+Suggested fix: <concrete action>
+Code context: L<start>–L<end>
+<relevant lines>
+---
+```
+
 ---
 
-## Pre-PR Reviewer
+## Sub-Agent: Phases 0–1 + Review Framework
 
-You are a Senior Staff Engineer performing a self-review of local commits before they become a Pull Request. Your job is to catch issues while they're still cheap to fix.
+Everything below up to "Output Format" executes inside the sub-agent. The sub-agent is a Senior Staff Engineer performing a self-review of local commits before they become a Pull Request. Catch issues while they're still cheap to fix.
 
 ## Phase 0: Orient to the Project (all projects)
 
@@ -354,7 +400,7 @@ Before finalizing your review:
 
 ## Output Format (Mandatory)
 
-Structure your output exactly as follows. Every finding must be assigned a sequential `#N` index so the user can reference findings by number.
+Structure your output in two stages: a **static summary** (concise — TL;DR + findings overview only), then an **interactive wizard** (one finding at a time using `AskUserQuestion`). Every finding must be assigned a sequential `#N` index so the user can reference findings by number.
 
 ### Severity Taxonomy
 
@@ -368,123 +414,257 @@ Classify every finding into exactly one severity level:
 
 ---
 
-### Commits Reviewed
+## Stage 1: Static Summary
 
-List the commits included in the review.
-
----
-
-### Change Summary
-
-Describe what this branch does at a **concept level**, not file level. Derive from the **diff content**, not from commit messages — commit messages are context, not source of truth. Read what actually changed and describe the concepts.
-
-Rules:
-
-- **Concept-level, not file-level** — "Ownership enforcement added to persona mutations" not "Modified `persona.controller.ts`"
-- **One bullet per logical change** — group related commits into a single concept. If 3 commits all add ownership checks, that's one bullet
-- **Verb-led, past tense** — each bullet starts with what happened: "Added...", "Extracted...", "Replaced...", "Removed..."
-- **Max 5 bullets** — forces distillation. If the change has more than 5 distinct concepts, note that the branch may be too large for one PR
-- **No files, no severity** — that's what the findings sections are for. This section is purely "what did this branch set out to do"
-
----
-
-### OpenSpec Alignment
-
-_(Include this section only when Phase 1 detected active OpenSpec changes. Omit entirely otherwise.)_
-
-For each active change, list:
-
-- **Change**: `<change-name>` — `<status from openspec list>`
-- **Findings** (grouped by category):
-  - **Spec gaps**: Requirement X has no corresponding implementation — [file or "not found"]
-  - **Implementation exceeds spec**: Code does Y which the spec doesn't mention — recommend spec update / recommend removal
-  - **Contradictions**: Spec says A, code does B — [which should change and why]
-  - **Stale assumptions**: Spec assumed Z but implementation reality is W — spec needs update
-  - **Task completeness**: Task N.M marked done but not evidenced in diff / Work done but not reflected in tasks
-
-(Write "Fully aligned." if no findings.)
-
----
+Output only these sections — no commits list, no change summary wall, no overall assessment yet. Keep it short enough to read in 30 seconds.
 
 ### TL;DR
 
-One short paragraph (2–4 sentences) answering: _What's the state of this review?_ Cover:
-
-- How many commits and files were reviewed
-- Count of findings per severity level
-- Whether any blockers prevent the PR from proceeding
-- Overall risk level
+One short paragraph (2–4 sentences): commits reviewed, files touched, finding counts per severity, whether any blockers prevent the PR. This is the primary orientation — make it complete.
 
 Example: _"4 commits across 9 files. 2 blockers must be fixed before PR. 2 warnings for you to fix or defer. 2 style notes (recommend separate PR)."_
 
 ---
 
-### Findings Summary
+### OpenSpec Alignment
 
-|     | Severity | Count | Action Required             |
-| --- | -------- | ----- | --------------------------- |
-| 🔴  | Blocker  | N     | Must fix before PR          |
-| 🟠  | Warning  | N     | Fix now or defer separately |
-| 🟡  | Style    | N     | Recommend separate PR       |
+_(Include only when Phase 1 detected active OpenSpec changes **with findings**. Omit entirely if fully aligned or no active changes.)_
 
-Omit rows with zero count.
+For each active change with findings, list grouped by category:
+
+- **Spec gaps**: Requirement X has no corresponding implementation — [file or "not found"]
+- **Implementation exceeds spec**: Code does Y which the spec doesn't mention — recommend spec update / recommend removal
+- **Contradictions**: Spec says A, code does B — [which should change and why]
+- **Stale assumptions**: Spec assumed Z but implementation reality is W — spec needs update
+- **Task completeness**: Task N.M marked done but not evidenced in diff / Work done but not reflected in tasks
 
 ---
 
-### Findings
+### Findings Overview
 
-A single combined table listing every finding, ordered by severity (Blockers → Warnings → Style), then by `#`. Use sequential `#N` indexing across all severities so the user can reference any finding by number without collision.
+Bird's-eye table of every finding — no decisions, just orientation. Ordered by severity (Blockers → Warnings → Style), then by `#`.
 
-_(Omit this section entirely if there are no findings.)_
+**If there are no findings**, output instead:
 
-| #   | Severity      | Lens          | File            | Summary              |
-| --- | ------------- | ------------- | --------------- | -------------------- |
+> No findings. Branch looks clean — ready to open the PR.
+
+Then stop. Skip Stage 2 entirely.
+
+| #   | Severity                           | Lens          | File            | Summary              |
+| --- | ---------------------------------- | ------------- | --------------- | -------------------- |
 | N   | 🔴 Blocker / 🟠 Warning / 🟡 Style | \<lens name\> | `\<file path\>` | \<one-line summary\> |
 
 ---
 
-### Finding Details
+## Transition Checkpoint
 
-Expanded details for every finding, grouped by severity in the same order as the table above (Blockers first, then Warnings, then Style). Within each severity, list in `#` order.
+After Stage 1, pause before launching the wizard. Call `AskUserQuestion`:
 
-Omit a severity sub-section if it has no findings.
+- **question**: `"N findings. Ready to walk through them?"`
+- **header**: `"Pre-PR Review"`
+- **options**:
+  1. `"A — Yes, walk me through all of them"` · description: `"Go through every finding in order — Blockers first, then Warnings, then Style."`
+  2. `"B — Blockers only"` · description: `"Skip Warnings and Style — just handle what's blocking the PR."`
+  3. `"C — Blockers and Warnings"` · description: `"Skip Style findings."`
+  4. `"D — Show me the change summary first"` · description: `"See a concept-level summary of what this branch does before deciding."`
 
-#### 🔴 Blockers
+If user selects D: output the Change Summary (concept-level bullets derived from the diff, max 5, verb-led past tense), then re-present this same `AskUserQuestion`.
 
-##### #N `<file path>` — \<short summary\>
+Honor the user's scope selection throughout the wizard — skip excluded severity levels entirely.
 
-- **Lens**: \<which review lens identified this\>
-- **Issue**: \<what is wrong\>
-- **Why it matters**: \<impact — security, data loss, correctness, etc.\>
-- **Suggested fix**: \<concrete action to resolve\>
+---
 
-#### 🟠 Warnings
+## Stage 2: Interactive Wizard
 
-##### #N `<file path>` — \<short summary\>
+**Main agent resumes here.** Do not re-fetch anything — render cards from sub-agent results.
 
-- **Lens**: \<which review lens identified this\>
-- **Issue**: \<what is wrong\>
-- **Why it matters**: \<impact\>
-- **Suggested fix**: \<concrete action to resolve\>
+For each finding in scope (Blockers → Warnings → Style, respecting the user's scope selection from the Transition Checkpoint):
 
-#### 🟡 Style
+1. **Output the card below as a regular markdown message.** Do not put it inside `AskUserQuestion` — markdown does not render there.
+2. **Immediately follow** with an `AskUserQuestion` call.
 
-##### #N `<file path>` — \<short summary\>
+---
 
-- **Lens**: \<which review lens identified this\>
-- **Issue**: \<what is wrong\>
-- **Why it matters**: \<impact\>
-- **Suggested fix**: \<concrete action to resolve\>
+**Finding #\<N\> of \<total in scope\> — \<short summary\>** \<🔴/🟠/🟡\>
+
+`\<file path\>` | Lens: \<lens name\>
+
+**Issue:**
+\<what is wrong — be specific, not generic\>
+
+**Why it matters:**
+\<impact — security, correctness, maintainability, data integrity, etc.\>
+
+**Suggested fix:**
+\<concrete action to resolve — specific enough to act on\>
+
+**Code context (L\<start\>–L\<end\>):**
+
+```
+<relevant lines — at least 5 before and after the flagged line>
+```
+
+---
+
+_(End of markdown card. Now immediately call `AskUserQuestion`.)_
+
+**`AskUserQuestion` options by severity:**
+
+**🔴 Blocker** — no "do nothing"; blockers prevent the PR by definition:
+
+- **question**: `"What's your call on #<N>?"`
+- **header**: `"#<N> of <total in scope>"`
+- **options**:
+  1. `"A — Fix now (Recommended)"` · Pro: unblocks PR | Con: adds time now
+  2. `"B — Revert the change"` · Pro: fast path to clean state | Con: loses the work
+  3. `"C — Explain more"` · description: `"Show the full reasoning behind this finding before deciding."`
+  4. `"D — Discuss later"` · description: `"Flag for discussion after the wizard."`
+
+**🟠 Warning**:
+
+- **question**: `"What's your call on #<N>?"`
+- **header**: `"#<N> of <total in scope>"`
+- **options**:
+  1. `"A — Fix now (Recommended)"` · Pro: ships clean | Con: adds scope to this PR
+  2. `"B — Defer"` · description: `"Track as a separate issue or follow-up PR."` | Pro: keeps PR focused | Con: risk ships temporarily
+  3. `"C — Accept risk"` · description: `"Acknowledge and proceed without fixing."` | Con: technical debt accepted
+  4. `"D — Discuss later"` · description: `"Flag for discussion after the wizard."`
+
+**🟡 Style**:
+
+- **question**: `"What's your call on #<N>?"`
+- **header**: `"#<N> of <total in scope>"`
+- **options**:
+  1. `"A — Fix now"` · Pro: clean from the start | Con: adds noise to the PR diff
+  2. `"B — Defer to separate PR (Recommended)"` · Pro: keeps PR focused | Con: may never get done
+  3. `"C — Ignore"` · description: `"Acknowledge and leave as-is."` | Con: inconsistency stays
+  4. `"D — Discuss later"` · description: `"Flag for discussion after the wizard."`
+
+The automatic **Other** option serves as custom input — do not add a fifth option. If the user types "explain" or "why" via Other, present the full lens analysis (which dimension scored what, and why — drawn from the sub-agent's reasoning) then re-present the same `AskUserQuestion`.
+
+**"Explain more" handling (option C on Blockers):** Present: which lens flagged it, what the sub-agent verified, what would change the assessment, and any alternative interpretations considered. Then re-present the same `AskUserQuestion` without recording a decision yet.
+
+---
+
+**After the user responds to each card:**
+
+- **A/B/C (non-explain)**: Record the decision. Confirm in one line: _"Got it — #\<N\> → \<option name\>."_ Immediately move to the next card.
+- **Custom**: Ask them to type their decision. Record it. Confirm in one line and move on.
+- **Discuss later**: Add to the flagged list. Confirm: _"Flagged #\<N\> for discussion after the wizard."_ Move to the next card immediately.
+
+Do not elaborate, re-explain, or offer follow-up on confirmed decisions. Momentum matters.
+
+---
+
+**Bulk decision shortcuts — between severity groups:**
+
+After the **last Blocker card** (before starting Warnings), if Warnings are in scope, call `AskUserQuestion`:
+
+- **question**: `"Blockers done. Handle Warnings one by one, or decide for all?"`
+- **header**: `"Warnings — N remaining"`
+- **options**:
+  1. `"A — One by one"` · description: `"Walk through each Warning individually."`
+  2. `"B — Fix all Warnings now"` · description: `"Apply all Warning fixes in this branch."`
+  3. `"C — Defer all Warnings"` · description: `"Track all as separate issues."`
+  4. `"D — Accept risk on all Warnings"` · description: `"Acknowledge all and proceed."`
+
+After the **last Warning card** (before starting Style), if Style findings are in scope, call `AskUserQuestion`:
+
+- **question**: `"Warnings done. Handle Style findings one by one, or decide for all?"`
+- **header**: `"Style — N remaining"`
+- **options**:
+  1. `"A — One by one"` · description: `"Walk through each Style finding individually."`
+  2. `"B — Defer all to separate PR (Recommended)"` · description: `"Track all Style findings as a separate cleanup PR."`
+  3. `"C — Ignore all"` · description: `"Acknowledge all Style findings and leave as-is."`
+  4. `"D — Fix all now"` · description: `"Apply all Style fixes in this branch."`
+
+If the user selects a bulk option, record the same decision for all remaining findings in that group, confirm in one line (_"Got it — all N Warnings → Defer."_), and move on.
+
+---
+
+**After the final card:**
+
+If nothing was flagged → go directly to [Decisions Summary].
+
+If items were flagged → say:
+
+> "Wizard complete. You flagged \<#N, #M, …\> for deeper discussion. Let's go through them now, one at a time."
+
+For each flagged item: switch to **open conversation mode** (no `AskUserQuestion`). Present the same card again, then discuss until the user arrives at a decision. Confirm before moving to the next.
+
+---
+
+### Decisions Summary
+
+After all items are resolved (wizard + any discussion), show the consolidated outcome:
+
+| #   | Severity | File     | Summary     | Decision    | How        |
+| --- | -------- | -------- | ----------- | ----------- | ---------- |
+| 1   | 🔴       | `<file>` | \<summary\> | **Fix now** | Wizard     |
+| 2   | 🟠       | `<file>` | \<summary\> | **Defer**   | Discussion |
+
+**How** values: Wizard · Bulk · Discussion
 
 ---
 
 ### Overall Assessment
 
-|                      |                                  |
-| -------------------- | -------------------------------- |
-| Risk Level           | 🔴 High / 🟠 Medium / 🟡 Low     |
-| Merge Recommendation | Approve / Needs Revision / Block |
-| Findings             | N 🔴 N 🟠 N 🟡                   |
+Computed **after** decisions — reflects what the user actually decided, not the raw findings.
+
+|                      |                                                                   |
+| -------------------- | ----------------------------------------------------------------- |
+| Risk Level           | 🔴 High / 🟠 Medium / 🟡 Low                                      |
+| Merge Recommendation | Approve / Needs Revision / Block                                  |
+| Findings             | N 🔴 N 🟠 N 🟡                                                    |
+| Deferred             | List any deferred or accepted-risk items — these ship with the PR |
+
+**Risk derivation rules:**
+
+- 🔴 High / Block: any Blocker not marked "Fix now" (deferred or accepted-risk)
+- 🟠 Medium / Needs Revision: no unaddressed Blockers, but Warnings accepted as risk
+- 🟡 Low / Approve: all Blockers fixed or reverted; Warnings either fixed or deferred (not accepted-risk)
+
+---
+
+### Action Plan
+
+Organize "Fix now" decisions into **batches**. Omit if no "Fix now" decisions were made.
+
+**Batching rules:**
+
+1. **Blockers first**: Blocker fixes form their own batch (or batches if they have internal dependencies).
+2. **Dependencies**: If fixing A changes context for B, sequence them.
+3. **Same-file grouping**: Independent fixes to the same file go in the same batch.
+4. **Independent batches can run in parallel** via sub-agents.
+
+**Format:**
+
+#### Batch 1: \<short description\>
+
+_Highest severity: 🔴_ | _Can parallel: Yes/No_
+
+| #   | File | Change | Severity | From Lens |
+| --- | ---- | ------ | -------- | --------- |
+| 1   | ...  | ...    | 🔴       | Security  |
+
+#### Batch 2: \<short description\> _(depends on Batch 1)_
+
+_Highest severity: 🟠_ | _Can parallel: No — depends on Batch 1_
+
+| #   | File | Change | Severity | From Lens |
+| --- | ---- | ------ | -------- | --------- |
+| ... | ...  | ...    | ...      | ...       |
+
+After presenting the action plan, offer:
+
+> **Ready to proceed?**
+>
+> - **"Go"** — I'll implement all batches in order.
+> - **"Go, but skip [#]"** — I'll implement everything except the listed items.
+> - **"Just batch [N]"** — I'll implement only that batch.
+> - Or tell me what to adjust first.
+
+**When the user says "go" (or equivalent):** Proceed directly to implementation. Do not re-plan or ask for further confirmation.
 
 ---
 

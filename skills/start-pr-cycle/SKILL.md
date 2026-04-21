@@ -51,15 +51,15 @@ When resuming here from `/triage-pr-comments`, open with:
 
 Then proceed with the Stage 4 steps.
 
-| From                                    | To            | Condition                                    |
-| --------------------------------------- | ------------- | -------------------------------------------- |
-| /triage-pr-comments (triage + fix + commit) | [4] Update    | User confirms commit in triage skill         |
-| [4] Update                              | [5] Push          | Checks pass after merge (or merge was no-op) |
-| [4] Update                              | /triage-pr-comments | Checks fail after merge — new triage round |
-| [5] Push                                | [6a] CI Watch     | User opts in                                 |
-| [5] Push                                | [7] Learn         | User declines CI watch                       |
-| [6a] CI Watch                           | /triage-pr-comments | CI fails — new triage round              |
-| [6a] CI Watch                           | [7] Learn         | CI passes                                    |
+| From                                        | To                  | Condition                                    |
+| ------------------------------------------- | ------------------- | -------------------------------------------- |
+| /triage-pr-comments (triage + fix + commit) | [4] Update          | User confirms commit in triage skill         |
+| [4] Update                                  | [5] Push            | Checks pass after merge (or merge was no-op) |
+| [4] Update                                  | /triage-pr-comments | Checks fail after merge — new triage round   |
+| [5] Push                                    | [6a] CI Watch       | User opts in                                 |
+| [5] Push                                    | [7] Learn           | User declines CI watch                       |
+| [6a] CI Watch                               | /triage-pr-comments | CI fails — new triage round                  |
+| [6a] CI Watch                               | [7] Learn           | CI passes                                    |
 
 ---
 

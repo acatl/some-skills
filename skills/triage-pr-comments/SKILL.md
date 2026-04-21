@@ -395,9 +395,9 @@ A bird's-eye table of every comment — no decisions yet, just orientation.
 
 **Initial Read values:** Agree · Agree w/ Mod · Decline · Needs Discussion · Unclear · Out of Scope · Addressed
 
-| # | Location | Reviewer | Summary | Initial Read |
-| - | -------- | -------- | ------- | ------------ |
-| 1 | \<link\> | \<user\> | \<one-line summary of what the comment says\> | \<initial read\> |
+| #   | Location | Reviewer | Summary                                       | Initial Read     |
+| --- | -------- | -------- | --------------------------------------------- | ---------------- |
+| 1   | \<link\> | \<user\> | \<one-line summary of what the comment says\> | \<initial read\> |
 
 ---
 
@@ -416,9 +416,10 @@ Then **for each comment in order**:
 
 **Comment #\<N\> of \<total\> — \<short summary\>**
 
-[\<parent-dir\>/\<filename\>:\<line\>](full/path#L\<line\>) | Reviewer: `<username>`
+[\<parent-dir\>/\<filename\>:\<line\>](full/path#L<line>) | Reviewer: `<username>`
 
 **Comment:**
+
 > "\<full comment text — do not truncate\>"
 
 **Code context (L\<start\>–L\<end\>):**
@@ -451,7 +452,6 @@ _(End of markdown card message. Now immediately call `AskUserQuestion`.)_
 - **question**: `"What's your call on #<N>?"`
 - **header**: `"#<N> of <total>"`
 - **options** (always in this order, max 4):
-
   1. **Recommended option** — label: `"A — <name> (Recommended)"` · description: one sentence of what it does, then `Pro: ...` then `Con: ...`
   2. **Meaningful alternative** — label: `"B — <name>"` · description: same format
   3. **Do nothing / defer** — label: `"C — Do nothing"` · description: when this is the right call; what the user is accepting
@@ -489,10 +489,10 @@ For each flagged item: switch to **open conversation mode** (no `AskUserQuestion
 
 After all items are resolved (wizard + any discussion), show the consolidated outcome:
 
-| # | Location | Reviewer | Initial Read | Your Decision | How |
-| - | -------- | -------- | ------------ | ------------- | --- |
-| 1 | \<link\> | \<user\> | Agree | **Agree — Option A** | Wizard |
-| 2 | \<link\> | \<user\> | Needs Discussion | **Agree w/ Mod — Option B** | Discussion |
+| #   | Location | Reviewer | Initial Read     | Your Decision               | How        |
+| --- | -------- | -------- | ---------------- | --------------------------- | ---------- |
+| 1   | \<link\> | \<user\> | Agree            | **Agree — Option A**        | Wizard     |
+| 2   | \<link\> | \<user\> | Needs Discussion | **Agree w/ Mod — Option B** | Discussion |
 
 **How** values: Wizard · Discussion
 
@@ -547,13 +547,13 @@ _(Only if UNCLEAR items remain unresolved after the wizard.)_ Draft an in-thread
 
 Reply in-thread (`gh api repos/{owner}/{repo}/pulls/{pr}/comments/{id}/replies`), not as top-level comments. No gratitude, filler, or apologies — technical substance only.
 
-| Initial Read    | Reply pattern                            | Example                                                                 |
-| --------------- | ---------------------------------------- | ----------------------------------------------------------------------- |
-| Agree           | State the fix                            | "Fixed — added null guard in handler."                                  |
-| Decline         | Lead with reasoning, reference standards | "Current impl uses X per project standards. Suggested change breaks Y." |
-| Agree w/ Mod    | Acknowledge issue, explain alternative   | "Valid issue. Using \<alt\> instead because \<reason\>."                |
-| Out of Scope    | Acknowledge merit, redirect              | "Tracked as #N to keep PR focused on \<scope\>."                        |
-| Was wrong       | State correction factually               | "Verified — you're correct. Fixing."                                    |
+| Initial Read | Reply pattern                            | Example                                                                 |
+| ------------ | ---------------------------------------- | ----------------------------------------------------------------------- |
+| Agree        | State the fix                            | "Fixed — added null guard in handler."                                  |
+| Decline      | Lead with reasoning, reference standards | "Current impl uses X per project standards. Suggested change breaks Y." |
+| Agree w/ Mod | Acknowledge issue, explain alternative   | "Valid issue. Using \<alt\> instead because \<reason\>."                |
+| Out of Scope | Acknowledge merit, redirect              | "Tracked as #N to keep PR focused on \<scope\>."                        |
+| Was wrong    | State correction factually               | "Verified — you're correct. Fixing."                                    |
 
 ---
 
