@@ -11,7 +11,6 @@ description: >
   reviewing a single file in isolation.
 license: MIT
 compatibility: Requires git.
-disable-model-invocation: true
 metadata:
   author: Acatl
 ---
@@ -369,7 +368,27 @@ Evaluate:
 
 ---
 
-### 10. Database Migration Safety
+### 10. Defensive Programming
+
+Evaluate each method in isolation — not just the system as a whole. Ask: what does this method assume, and what happens when those assumptions are wrong?
+
+- **Nested resource ownership**: when a method takes a sub-resource ID (e.g. `imageId` on a listing route), does it verify the resource belongs to the parent in the route? Series middleware only covers the outermost scope.
+- **Count-check atomicity**: any pattern of read-count → conditional insert is a race condition. Is the cap enforced inside a transaction?
+- **Buffer/array access**: any access at a fixed index — is there a length guard before it?
+- **Error exhaustiveness**: catch blocks and status-to-state mappers — does each one handle every HTTP status the endpoint documents, or does a catch-all default mask distinct failure modes?
+- **Partial failure**: if step 1 of N succeeds and step 2 fails, is the system left in a consistent state?
+
+Flag:
+
+- Service methods that operate on a sub-resource ID without verifying parent-chain ownership
+- Read-then-write patterns on shared counters without transactional protection
+- Array index access without a preceding length check
+- Catch blocks with a generic fallback that swallows 4xx/5xx codes the endpoint is documented to return
+- Multi-step operations with no rollback or cleanup on mid-sequence failure
+
+---
+
+### 11. Database Migration Safety
 
 _(Skip this lens if the diff does not include database migrations.)_
 

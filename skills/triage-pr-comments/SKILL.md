@@ -13,7 +13,6 @@ description: >
 license: MIT
 compatibility: Requires git, gh (GitHub CLI), and jq.
 argument-hint: "#<pr-number>"
-disable-model-invocation: true
 metadata:
   author: Acatl
 ---
